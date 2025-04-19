@@ -1,0 +1,65 @@
+version: "3.8"
+services:
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - my-network
+    depends_on:
+      - collector
+  collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      # 将容器内 4317 端口（OTLP gRPC 接收端口）映射到宿主机 4317 端口
+      - "4317:4317"
+      # 将容器内 4318 端口（OTLP HTTP 接收端口）映射到宿主机 4318 端口
+      - "4318:4318"
+      # 将容器内 55678 端口（接收 Jaeger gRPC 格式追踪数据）映射到宿主机 55678 端口
+      - "55678:55678"
+      # 将容器内 55679 端口（接收 Zipkin 追踪数据）映射到宿主机 55679 端口
+      - "55679:55679"
+      # 将容器内 55680 端口（接收 Prometheus 指标数据）映射到宿主机 55680 端口
+      - "55680:55680"
+      # 将容器内 8888 端口（OpenTelemetry Collector 的 metrics 服务端口）映射到宿主机 8888 端口
+      - "8888:8888"
+      - "8889:8889"  # 新增：映射 Prometheus 出口器端口
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    depends_on:
+      - jaeger
+    networks:
+      - my-network
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      # 将容器内 14250 端口（接收 Jaeger gRPC 格式追踪数据）映射到宿主机 14250 端口
+      - "14250:14250"
+      # 将容器内 14268 端口（Jaeger Query 服务的 gRPC 接口端口）映射到宿主机 14268 端口
+      - "14268:14268"
+      # 将容器内 16686 端口（Jaeger 的 Web UI 端口）映射到宿主机 16686 端口
+      - "16686:16686"
+      # 将容器内 4317 端口（OTLP gRPC 接收端口）映射到宿主机 4317 端口
+      - "34317:4317"
+      # 将容器内 4318 端口（OTLP HTTP 接收端口）映射到宿主机 4318 端口
+      - "34318:4318"
+      # 将容器内 9411 端口（接收 Zipkin 格式追踪数据）映射到宿主机 9411 端口
+      - "9411:9411"
+    networks:
+      - my-network
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - my-network
+    depends_on:
+      - jaeger # Grafana启动依赖jaeger
+      - prometheus
+
+networks:
+  my-network:
+    driver: bridge

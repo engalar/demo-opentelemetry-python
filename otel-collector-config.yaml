@@ -1,0 +1,84 @@
+# 全局配置部分，定义收集器的一些通用设置
+receivers:
+  # otlp 接收器，可同时接收基于 OpenTelemetry 协议 (OTLP) 的 traces 和 metrics 数据
+  otlp:
+    # 同时配置 gRPC 和 HTTP 接收方式
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
+  # jaeger 接收器，用于接收 Jaeger 格式的 traces 数据
+  jaeger:
+    # 配置多种协议接收方式
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:14250"
+      thrift_binary:
+        endpoint: "0.0.0.0:6832"
+      thrift_compact:
+        endpoint: "0.0.0.0:6831"
+      thrift_http:
+        endpoint: "0.0.0.0:14268"
+
+  # zipkin 接收器，用于接收 Zipkin 格式的 traces 数据
+  zipkin:
+    # 监听在 9411 端口
+    endpoint: "0.0.0.0:9411"
+
+  # prometheus 接收器，用于接收 Prometheus 格式的 metrics 数据
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8888']
+
+# 处理器部分，用于对收集到的数据进行处理和转换
+processors:
+  # batch 处理器，用于批量处理数据，提高性能
+  batch:
+    # 每个批次的最大跨度数量（针对 traces）
+    send_batch_size: 1000
+    # 最大等待时间，超过该时间后即使批次未达到最大跨度数量也会发送
+    timeout: 10s
+
+# 出口器部分，用于将处理后的数据发送到目标系统
+exporters:
+  # otlp 出口器，将数据发送到 Jaeger
+  otlp:
+    endpoint: "jaeger:4317"
+    tls:
+      insecure: true
+
+  # prometheus 出口器，将 metrics 数据以 Prometheus 格式暴露
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+
+  # debug 出口器，用于在控制台打印日志，替代已弃用的 logging 出口器
+  debug:
+    verbosity: detailed
+
+# 服务部分，定义收集器的整体服务配置
+service:
+  # 管道部分，定义数据的流动路径
+  pipelines:
+    # 追踪数据管道
+    traces:
+      # 配置接收器，使用上面定义的 otlp、jaeger 和 zipkin 接收器
+      receivers: [otlp, jaeger, zipkin]
+      # 配置处理器，使用上面定义的 batch 处理器
+      processors: [batch]
+      # 配置出口器，使用上面定义的 otlp 和 debug 出口器
+      exporters: [otlp, debug]
+
+    # 指标数据管道
+    metrics:
+      # 配置接收器，使用上面定义的 otlp 和 prometheus 接收器
+      receivers: [otlp, prometheus]
+      # 配置处理器，使用上面定义的 batch 处理器
+      processors: [batch]
+      # 配置出口器，使用上面定义的 prometheus 和 debug 出口器
+      exporters: [prometheus, debug]    
